@@ -1027,10 +1027,12 @@ MP_DEFINE_CONST_FUN_OBJ_2(gc9a01_GC9A01_vscsad_obj, gc9a01_GC9A01_vscsad);
 STATIC mp_obj_t gc9a01_GC9A01_init(mp_obj_t self_in) {
     gc9a01_GC9A01_obj_t *self = MP_OBJ_TO_PTR(self_in);
     gc9a01_GC9A01_hard_reset(self_in);
-    mp_hal_delay_ms(100);
+    // it already sleeps inside hard_reset
+    //mp_hal_delay_ms(100);
 
-    gc9a01_GC9A01_soft_reset(self_in);
-    mp_hal_delay_ms(100);
+    // Is this necessary? The micropython driver does not do this
+    //gc9a01_GC9A01_soft_reset(self_in);
+    //mp_hal_delay_ms(100); // soft_reset already delays
 
     write_cmd(self, 0xEF, (const uint8_t *) NULL, 0);
 	write_cmd(self, 0xEB, (const uint8_t *) "\x14", 1);
@@ -1090,8 +1092,10 @@ STATIC mp_obj_t gc9a01_GC9A01_init(mp_obj_t self_in) {
     if (self->backlight)
         mp_hal_pin_write(self->backlight, 1);
 
-    write_cmd(self, GC9A01_DISPON, (const uint8_t *) NULL, 0);
-    mp_hal_delay_ms(120);
+    // is this necesary? the python driver does not do this
+    // (seems to be 0x29 again)
+    //write_cmd(self, GC9A01_DISPON, (const uint8_t *) NULL, 0);
+    //mp_hal_delay_ms(120);
 
     return mp_const_none;
 }
