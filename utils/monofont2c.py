@@ -70,6 +70,11 @@ def process_char(img, bits):
                 bit_string += '1' if (color & (1 << bit-1)) else '0'
             image_bitstring += bit_string
 
+def brightness(color):
+    r = (color >> 11) & 31
+    g = (color >> 5) & 63
+    b = color & 31
+    return r/31.0 + g/63.0 + b/31.0
 
 def main():
     parser = argparse.ArgumentParser(
@@ -157,6 +162,28 @@ def main():
     bpp_im = im.convert(mode='P', palette=Image.ADAPTIVE, colors=1 << bpp)
     palette = bpp_im.getpalette()
 
+    colors = []
+    #colors565 = []
+    for color in range(1 << bpp):
+
+        # get rgb values and convert to 565
+        color565 = (
+            ((palette[color*3] & 0xF8) << 8) |
+            ((palette[color*3+1] & 0xFC) << 3) |
+            ((palette[color*3+2] & 0xF8) >> 3))
+
+        #colors565.append(color565)
+
+        # swap bytes in 565
+        color = ((color565 & 0xff) << 8) + ((color565 & 0xff00) >> 8)
+
+        # append byte swapped 565 color to colors
+        colors.append(f'{color:04x}')
+    
+    #sorted_colors = sorted(colors565, key=brightness)
+    #color_map = [sorted_colors.index(color) for color in colors565]
+    #print("color_map", color_map)
+
     # convert all characters into a ascii bit string
     ofs = 0
     for char in characters:
@@ -174,15 +201,15 @@ def main():
     print(f"// {cmdline}")
     print()
 
-    print("include \"font.h\"")
+    print("#include \"font.h\"")
     print()
 
-    print(f"static const char *name = \"{name}\";")
+    print(f"static const char name[] = \"{name}\";")
     print(f"static const uint8_t width = {char_im.width};")
     print(f"static const uint8_t height = {char_im.height};")
     print(f"static const uint8_t bpp = {bpp};")
 
-    print(f"static const char *map = \"{char_map}\";") 
+    print(f"static const char map[] = \"{char_map}\";") 
     print()
 
     print("static const uint8_t bitmap[] = {", sep='', end='')

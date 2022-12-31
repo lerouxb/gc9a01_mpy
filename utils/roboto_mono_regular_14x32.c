@@ -1,12 +1,12 @@
 // ./monofont2c.py /mnt/chromeos/archive/Roboto_Mono.zip/static/RobotoMono-Regular.ttf 24 4 -c 32-127 -n roboto_mono_regular_14x32
 
-include "font.h"
+#include "font.h"
 
-static const char *name = "roboto_mono_regular_14x32";
+static const char name[] = "roboto_mono_regular_14x32";
 static const uint8_t width = 14;
 static const uint8_t height = 32;
 static const uint8_t bpp = 4;
-static const char *map = " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~";
+static const char map[] = " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~";
 
 static const uint8_t bitmap[] = {
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 
