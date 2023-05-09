@@ -638,17 +638,16 @@ MP_DEFINE_CONST_FUN_OBJ_3(gc9a01_GC9A01_get_string_width_obj, gc9a01_GC9A01_get_
 typedef struct {
     gc9a01_GC9A01_obj_t *self;
     const struct mf_font_s *font;
-    int16_t char_x;
-    int16_t char_y;
-    uint16_t char_width;
-    // use background_info if non-zero, otherwise bg
+    //int16_t char_x;
+    //int16_t char_y;
+    //uint16_t char_width;
     uint16_t bg;
-    mp_buffer_info_t *background_info;
+    mp_buffer_info_t *target_info;
     uint16_t shades[256];
-    uint8_t *char_buffer;
-    uint32_t char_buffer_size;
-    uint32_t char_size;
-    bool to_background;
+    //uint8_t *char_buffer;
+    //uint32_t char_buffer_size;
+    //uint32_t char_size;
+    //bool to_background;
     bool bounds_error;
     int16_t bounds_px;
     int16_t bounds_py;
@@ -738,6 +737,7 @@ bool check_buffer_window(gc9a01_GC9A01_obj_t *self, mp_buffer_info_t *from_info,
     return true;
 }
 
+/*
 static void blit_partial_background(gc9a01_GC9A01_obj_t *self, mp_buffer_info_t *from_info, uint16_t x, uint16_t y, uint16_t width, uint16_t height) {
     if (!check_buffer_window(self, from_info, x, y, width, height)) {
         mp_raise_ValueError(MP_ERROR_TEXT("buffer bounds check fail"));
@@ -769,7 +769,10 @@ STATIC mp_obj_t gc9a01_GC9A01_blit_partial_background(size_t n_args, const mp_ob
     return mp_const_none;
 }
 MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(gc9a01_GC9A01_blit_partial_background_obj, 6, 6, gc9a01_GC9A01_blit_partial_background);
+*/
 
+// TODO: just remove this
+/*
 static void copy_partial_background(gc9a01_GC9A01_obj_t *self, mp_buffer_info_t *from_info, mp_buffer_info_t *to_info, uint16_t x, uint16_t y, uint16_t width, uint16_t height) {
     if (!check_buffer_window(self, from_info, x, y, width, height)) {
         mp_raise_ValueError(MP_ERROR_TEXT("buffer bounds fail"));
@@ -805,41 +808,42 @@ STATIC mp_obj_t gc9a01_GC9A01_copy_partial_background(size_t n_args, const mp_ob
     return mp_const_none;
 }
 MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(gc9a01_GC9A01_copy_partial_background_obj, 7, 7, gc9a01_GC9A01_copy_partial_background);
+*/
 
 static void pixel_callback(int16_t x, int16_t y, uint8_t count, uint8_t alpha, void *state) {
     render_state_t *s = (render_state_t *)state;
+
+    gc9a01_GC9A01_obj_t *self = s->self;
 
     // stop processing if there was already a bounds error
     if (s->bounds_error) {
         return;
     }
-
-    // convert from display coordinates to buffer coordinates
-    int16_t px = x - s->char_x;
-    int16_t py = y - s->char_y;
     
-    if (py < 0 || py >= s->font->height) {
-        s->bounds_px = px;
-        s->bounds_py = py;
+    if (y < 0 || y >= self->height) {
+        s->bounds_px = x;
+        s->bounds_py = y;
         s->bounds_count = count;
         s->bounds_error = true;
         return;
     }
 
     // this assumes that count can't be more than ~ 1 line
-    if (px < 0 || (py == s->font->height-1 && px + count >= s->char_width)) {
-        s->bounds_px = px;
-        s->bounds_py = py;
+    if (x < 0 || (y == self->height-1 && x + count >= self->width)) {
+        s->bounds_px = x;
+        s->bounds_py = y;
         s->bounds_count = count;
         s->bounds_error = true;
         return;
     }
 
+    uint8_t *target_buf = (uint8_t *)s->target_info->buf;
+
     uint16_t color = s->shades[alpha];
-    uint32_t pos = (py * s->char_width + px) * 2;
+    uint32_t pos = (y * self->width + x) * 2;
     while (count) {
-        s->char_buffer[pos] = (color & 0xff00) >> 8;
-        s->char_buffer[pos+1] = color & 0xff;
+        target_buf[pos] = (color & 0xff00) >> 8;
+        target_buf[pos+1] = color & 0xff;
         pos += 2;
         count--;
     }
@@ -852,12 +856,13 @@ static uint8_t character_callback(int16_t x, int16_t y, mf_char character, void 
         return 0;
     }
 
-    gc9a01_GC9A01_obj_t *self = s->self;
-    s->char_x = x;
-    s->char_y = y;
+    //gc9a01_GC9A01_obj_t *self = s->self;
+    //s->char_x = x;
+    //s->char_y = y;
 
     // HACK
-    if (strcmp(s->font->short_name, "DSEG14Classic_Bold40") == 0) {
+    /*
+    if (strcmp(s->font->short_name, "DSEG7Classic_Bold48") == 0) {
         s->char_width = character == ':' ? 13 : s->font->width;
     }
     else {
@@ -883,9 +888,11 @@ static uint8_t character_callback(int16_t x, int16_t y, mf_char character, void 
             }
         }
     }
+    */
 
-    uint8_t r = mf_render_character(s->font, x, y, character, pixel_callback, state);
+    return mf_render_character(s->font, x, y, character, pixel_callback, state);
 
+    /*
     if (character == ' ') {
         return r;
     }
@@ -904,16 +911,6 @@ static uint8_t character_callback(int16_t x, int16_t y, mf_char character, void 
                 to_offset += 2;
             }
         }
-        // copy the buffer to the background buffer
-        /*
-        int row_offset = y*self->width;
-        for (int row=y; row<(y+height); row++) {
-            int from_offset = row_offset + x;
-            write_spi(self->spi_obj, (const uint8_t*)from_info->buf + from_offset*2, width*2);
-            row_offset += self->width;
-        }
-        */
-         
     }
     else {
         // copy the buffer to the screen
@@ -925,6 +922,7 @@ static uint8_t character_callback(int16_t x, int16_t y, mf_char character, void 
     }
 
     return r;
+    */
 }
 
 uint16_t blend(uint16_t fg, uint16_t bg, uint16_t alpha)
@@ -948,6 +946,9 @@ uint16_t blend(uint16_t fg, uint16_t bg, uint16_t alpha)
     return (uint16_t) ((out_r << 11) | (out_g << 5) | out_b);
 }
 
+/*
+font_name, x0, y0, align(0=left, 1=middle, 2=right), text, fg, bg, target
+*/
 STATIC mp_obj_t gc9a01_GC9A01_render_aligned(size_t n_args, const mp_obj_t *args) {
     gc9a01_GC9A01_obj_t *self = MP_OBJ_TO_PTR(args[0]);
 
@@ -980,50 +981,33 @@ STATIC mp_obj_t gc9a01_GC9A01_render_aligned(size_t n_args, const mp_obj_t *args
         state.shades[i] = blend(fg, bg, i);
     }
 
-    state.char_buffer_size = font->width * font->height * 2;
-    state.char_buffer = m_malloc(state.char_buffer_size);
+    //state.char_buffer_size = font->width * font->height * 2;
+    //state.char_buffer = m_malloc(state.char_buffer_size);
     state.bounds_error = false;
 
-    if (n_args >= 9) {
-        mp_buffer_info_t background_info;
-        mp_get_buffer_raise(args[8], &background_info, MP_BUFFER_READ);
-        state.background_info = &background_info;
-    }
-    else {
-        state.background_info = 0;
-    }
-
-    if (n_args == 10) {
-        //state.to_background = mp_obj_is_true(args[9]);
-        state.to_background = true;
-    }
-    else {
-        state.to_background = false;
-    }
+    mp_buffer_info_t target_info;
+    mp_get_buffer_raise(args[8], &target_info, MP_BUFFER_READ);
+    state.target_info = &target_info;
 
     mf_render_aligned(font, x0, y0, align, text, 0, character_callback, &state);
 
-    m_free(state.char_buffer);
+    //m_free(state.char_buffer);
 
     if (state.bounds_error) {
-        /*
-        mp_printf(MICROPY_ERROR_PRINTER, "x=%d, y=%d, cx=%d, cy=%d, px=%d, py=%d, count=%d, width=%d, height=%d\n",
+        mp_printf(MICROPY_ERROR_PRINTER, "x=%d, y=%d, px=%d, py=%d, count=%d, width=%d, height=%d\n",
             x0,
             y0,
-            state.char_x,
-            state.char_y,
             state.bounds_px,
             state.bounds_py,
             state.bounds_count,
             state.font->width,
             state.font->height);
-        */
 		mp_raise_msg(&mp_type_OSError, MP_ERROR_TEXT("bounds check fail"));
     }
 
     return mp_const_none;
 }
-MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(gc9a01_GC9A01_render_aligned_obj, 8, 10, gc9a01_GC9A01_render_aligned);
+MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(gc9a01_GC9A01_render_aligned_obj, 9, 9, gc9a01_GC9A01_render_aligned);
 
 
 STATIC mp_obj_t gc9a01_GC9A01_write_len(size_t n_args, const mp_obj_t *args) {
@@ -1908,8 +1892,8 @@ STATIC MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(gc9a01_GC9A01_jpg_obj, 4, 5, gc9a01_G
 
 
 STATIC const mp_rom_map_elem_t gc9a01_GC9A01_locals_dict_table[] = {
-    { MP_ROM_QSTR(MP_QSTR_copy_partial_background), MP_ROM_PTR(&gc9a01_GC9A01_copy_partial_background_obj) },
-    { MP_ROM_QSTR(MP_QSTR_blit_partial_background), MP_ROM_PTR(&gc9a01_GC9A01_blit_partial_background_obj) },
+    //{ MP_ROM_QSTR(MP_QSTR_copy_partial_background), MP_ROM_PTR(&gc9a01_GC9A01_copy_partial_background_obj) },
+    //{ MP_ROM_QSTR(MP_QSTR_blit_partial_background), MP_ROM_PTR(&gc9a01_GC9A01_blit_partial_background_obj) },
     { MP_ROM_QSTR(MP_QSTR_fill_buffer_texture), MP_ROM_PTR(&gc9a01_GC9A01_fill_buffer_texture_obj) },
     { MP_ROM_QSTR(MP_QSTR_get_font_list), MP_ROM_PTR(&gc9a01_GC9A01_get_font_list_obj) },
     { MP_ROM_QSTR(MP_QSTR_get_string_width), MP_ROM_PTR(&gc9a01_GC9A01_get_string_width_obj) },
